@@ -64,3 +64,28 @@ All of these parameters are explicitly set in `shrey_simulation_clean.py`.
    - Save `simulated_microdata_100k.csv` and `simulation_results.csv`.
 3. Inspect `simulation_results.csv` to compare the recovered β’s to the
    true DGP values.
+
+   ---
+
+## Monte Carlo Extension (Baseline, Light)
+
+The same DGP is also used in a light Monte Carlo experiment to see how the
+estimators behave across many simulated samples.
+
+### Files
+
+- `results/monte_carlo_raw_baseline_light.csv`  
+  Coefficient draws from R = 50 Monte Carlo replications of the baseline DGP
+  (each replication uses n = 50,000 synthetic workers). Each row contains:
+  `rep`, `specification`, `target`, `true_beta`, `beta_hat`, and `se`.
+
+- `results/monte_carlo_summary_baseline_light.csv`  
+  Summary statistics by specification:
+  `true_beta`, `bias`, `rmse`, `coverage_95`, and `size_at_0`.
+
+### How to Reproduce the Monte Carlo
+
+1. Open `code/Shrey-Simulation-Clean.ipynb` in Google Colab (or a local Jupyter environment).  
+2. Run all cells, including the final block labeled “MONTE CARLO BASELINE (light)”.  
+3. The notebook will regenerate `results/monte_carlo_raw_baseline_light.csv`
+   and `results/monte_carlo_summary_baseline_light.csv` in the working directory.
