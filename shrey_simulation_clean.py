@@ -70,6 +70,12 @@ results.to_csv('simulation_results.csv', index=False)
 print("\nFiles saved: simulated_microdata_100k.csv + simulation_results.csv")
 print(results.round(3))
 
+
+
+
+// monte carlo code
+
+
 import pandas as pd
 import numpy as np
 import statsmodels.formula.api as smf
