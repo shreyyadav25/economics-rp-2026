@@ -69,3 +69,130 @@ results.to_csv('simulation_results.csv', index=False)
 # files.download('simulation_results.csv')
 print("\nFiles saved: simulated_microdata_100k.csv + simulation_results.csv")
 print(results.round(3))
+
+import pandas as pd
+import numpy as np
+import statsmodels.formula.api as smf
+
+# Re-use parameters defined above (true_beta_low_skill, true_beta_high_skill, tau_mean, tau_sd)
+# Override n and R here to keep Monte Carlo light
+n = 50_000          # sample size per replication (smaller than 100k to run faster)
+R = 50              # number of Monte Carlo replications (can increase later if needed)
+
+np.random.seed(42)
+
+print("SHREY YADAV | MONTE CARLO BASELINE (light) | github.com/shreyyadav25/economics-rp-2026")
+print(f"n = {n}, R = {R}")
+
+def generate_baseline_dgp():
+    years = np.random.choice(
+        [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026], n
+    )
+    ai_exposure = np.clip(
+        np.random.normal(tau_mean, tau_sd, n), 0, 1
+    )
+    college = np.random.choice([0, 1], n, p=[0.65, 0.35])
+    post = (years >= 2024).astype(int)
+    eps = np.random.normal(0, 0.3, n)
+
+    log_wage = (
+        true_beta_low_skill * ai_exposure * post * (1 - college)
+        + true_beta_high_skill * ai_exposure * post * college
+        + eps
+    )
+
+    df_mc = pd.DataFrame({
+        'year': years,
+        'ai_exposure': ai_exposure,
+        'college': college,
+        'post': post,
+        'log_wage': log_wage
+    })
+    return df_mc
+
+records = []
+
+for r in range(R):
+    df_mc = generate_baseline_dgp()
+
+    model_full = smf.ols(
+        'log_wage ~ ai_exposure * post * C(college)', data=df_mc
+    ).fit()
+    model_simple = smf.ols(
+        'log_wage ~ ai_exposure * post + C(college)', data=df_mc
+    ).fit()
+
+    beta_simple = model_simple.params['ai_exposure:post']
+    se_simple = model_simple.bse['ai_exposure:post']
+
+    beta_full_high = model_full.params['ai_exposure:post']
+    se_full_high = model_full.bse['ai_exposure:post']
+
+    beta_full_low = model_full.params['ai_exposure:post:C(college)[T.1]']
+    se_full_low = model_full.bse['ai_exposure:post:C(college)[T.1]']
+
+    records.append({
+        'rep': r,
+        'specification': 'simple_pooled',
+        'target': 'high',
+        'true_beta': true_beta_high_skill,
+        'beta_hat': beta_simple,
+        'se': se_simple
+    })
+    records.append({
+        'rep': r,
+        'specification': 'full_high',
+        'target': 'high',
+        'true_beta': true_beta_high_skill,
+        'beta_hat': beta_full_high,
+        'se': se_full_high
+    })
+    records.append({
+        'rep': r,
+        'specification': 'full_low',
+        'target': 'low',
+        'true_beta': true_beta_low_skill,
+        'beta_hat': beta_full_low,
+        'se': se_full_low
+    })
+
+results_mc = pd.DataFrame(records)
+print("\nMonte Carlo baseline (R reps) finished.")
+print(results_mc.head())
+
+summary_rows = []
+
+for spec, g in results_mc.groupby('specification'):
+    true_val = g['true_beta'].iloc[0]
+    bh = g['beta_hat']
+    se = g['se']
+
+    bias = (bh - true_val).mean()
+    rmse = np.sqrt(((bh - true_val)**2).mean())
+
+    lower = bh - 1.96 * se
+    upper = bh + 1.96 * se
+    coverage = ((true_val >= lower) & (true_val <= upper)).mean()
+
+    t_stats = bh / se.replace(0, np.nan)
+    size_at_0 = (np.abs(t_stats) > 1.96).mean()
+
+    summary_rows.append({
+        'specification': spec,
+        'true_beta': true_val,
+        'bias': bias,
+        'rmse': rmse,
+        'coverage_95': coverage,
+        'size_at_0': size_at_0
+    })
+
+summary_mc = pd.DataFrame(summary_rows)
+print("\nMonte Carlo summary (baseline, light):")
+print(summary_mc)
+
+results_mc.to_csv('monte_carlo_raw_baseline_light.csv', index=False)
+summary_mc.to_csv('monte_carlo_summary_baseline_light.csv', index=False)
+
+print("\nFiles saved in this notebook:")
+print(" - monte_carlo_raw_baseline_light.csv")
+print(" - monte_carlo_summary_baseline_light.csv")
